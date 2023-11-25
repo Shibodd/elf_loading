@@ -70,28 +70,9 @@ void ElfLoader::copy_segments_to_mem() {
   }
 }
 
-ElfLoader::ElfLoader(std::vector<char> data_in)
-  : elf_file(data_in), elf({ &*elf_file.begin(), &*elf_file.end() }) { }
-
-ElfLoader ElfLoader::from_file(const char* path) {
-  printf("Loading ELF file %s\n", path);
-  std::ifstream f(path, std::ios::binary | std::ios::ate);
-  MY_ASSERT_PERROR(f.good(), "Failed to open file.");
-
-  std::streamsize size = f.tellg();
-
-  printf("File has length %li.\n", size);
-  std::vector<char> data(size);
-  f.seekg(0, std::ios::beg);
-  f.read(data.data(), size);
-  f.close();
-
-  ElfLoader ans(data);
-
-  printf("Succesfully loaded ELF file to memory.\n");
-  return ans;
-}
-
+ElfLoader::ElfLoader(Span<char> elf_file)
+  : elf(elf_file) { }
+  
 
 void ElfLoader::load() {
   size_t len = get_mmap_len();

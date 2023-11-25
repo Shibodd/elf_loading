@@ -29,9 +29,7 @@ class ElfLoader {
   }
 
 public:
-  ElfLoader(std::vector<char> data_in);
-
-  static ElfLoader from_file(const char* path);
+  ElfLoader(Span<char> elf_file);
 
   void load();
   void unload();
