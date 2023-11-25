@@ -21,8 +21,8 @@ Span<Elf64_Sym> ElfView::make_symbol_table() {
   return make_span_of_section_data<Elf64_Sym>(shdr);
 }
 
-Span<char> ElfView::make_section_string_table(uintptr_t elf, Span<Elf64_Shdr> section_headers) {
-  Elf64_Half index = ((Elf64_Ehdr*)elf)->e_shstrndx;
+Span<char> ElfView::make_section_string_table() {
+  Elf64_Half index = header->e_shstrndx;
   assert(index != SHN_UNDEF && "File has no section name string table!");
 
   Elf64_Shdr* shdr = &section_headers[index];
@@ -34,9 +34,9 @@ ElfView::ElfView(Span<char> data) :
   header((Elf64_Ehdr*)data.begin()),
   segment_headers((Elf64_Phdr*)(get_addr() + header->e_phoff), header->e_phnum),
   section_headers((Elf64_Shdr*)(get_addr() + header->e_shoff), header->e_shnum),
-  section_string_table(get_section_string_table()),
-  symbol_string_table(get_symbol_string_table()),
-  symbol_table(get_symbol_table())
+  section_string_table(make_section_string_table()),
+  symbol_string_table(make_symbol_string_table()),
+  symbol_table(make_symbol_table())
 {
   
 }
@@ -55,11 +55,13 @@ void ElfView::print_symbol_table() {
 Elf64_Sym* ElfView::resolve_symbol(const char* name) {
   auto& symbol_strtab = symbol_string_table;
 
-  printf("Resolving %s\n", name);
+  printf("Resolving %s... ", name);
+  fflush(stdout);
   Elf64_Sym* s = find_single_in_span<Elf64_Sym>(symbol_table, [name, &symbol_strtab] (const Elf64_Sym& sym) {
     const char* sym_name = symbol_strtab.begin() + sym.st_name;
     bool ans = strcmp(sym_name, name) == 0;
     return ans;
   });
+  printf("Symbol resolved!\n");
   return s;
 }

@@ -27,7 +27,7 @@ class ElfView {
 
   Span<char> make_symbol_string_table();
   Span<Elf64_Sym> make_symbol_table();
-  Span<char> make_section_string_table(uintptr_t elf, Span<Elf64_Shdr> section_headers);
+  Span<char> make_section_string_table();
 
 public:
   ElfView(Span<char> data);
