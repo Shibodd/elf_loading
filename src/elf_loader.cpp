@@ -17,20 +17,16 @@ extern "C" {
 #include <elf.h>
 }
 
-bool ElfLoader::is_segment_loadable(const Elf64_Phdr& seg) {
-  return seg.p_type == PT_LOAD && seg.p_memsz > 0;
-}
-
 size_t ElfLoader::get_mmap_len() {
   printf("Computing mmap len.\n");
 
   uintptr_t vaddr_min = std::numeric_limits<uintptr_t>::max();
   uintptr_t vaddr_max = std::numeric_limits<uintptr_t>::min();
 
-  for (auto& seg : elf.get_segment_headers()) {
-    if (is_segment_loadable(seg)) {
-      vaddr_min = std::min(vaddr_min, seg.p_vaddr);
-      vaddr_max = std::max(vaddr_max, seg.p_vaddr + seg.p_memsz);
+  for (auto& phdr : elf.get_program_headers()) {
+    if (phdr.p_type == PT_LOAD && phdr.p_memsz > 0) {
+      vaddr_min = std::min(vaddr_min, phdr.p_vaddr);
+      vaddr_max = std::max(vaddr_max, phdr.p_vaddr + phdr.p_memsz);
     }
   }
 
@@ -60,11 +56,13 @@ void ElfLoader::mmap_pages(size_t len) {
 }
 
 void ElfLoader::copy_segments_to_mem() {
-  for (auto& seg : elf.get_segment_headers()) {
-    if (is_segment_loadable(seg)) {
-      void* dst = (void*)(get_base_addr() + seg.p_vaddr);
-      void* src = (void*)(elf.get_addr() + seg.p_offset);
-      size_t len = seg.p_memsz;
+  for (auto& phdr : elf.get_program_headers()) {
+    if (phdr.p_type == PT_LOAD && phdr.p_memsz > 0) {
+      void* dst = (void*)(get_base_addr() + phdr.p_vaddr);
+      void* src = (void*)(elf.get_addr() + phdr.p_offset);
+      size_t len = phdr.p_memsz;
+
+      assert(len == phdr.p_filesz && "This requires padding, which is not implemented.");
 
       printf("Copying from %lu bytes from %p to %p.\n", len, src, dst);
       std::memcpy(dst, src, len);
@@ -99,24 +97,49 @@ void ElfLoader::load() {
   size_t len = get_mmap_len();
   mmap_pages(len);
   copy_segments_to_mem();
+  fixup_relocations();
 }
 
-void ElfLoader::relocate() {
-  /*
-  for (auto& shdr : get_section_headers(elf)) {
-    switch (shdr.sh_type) {
+void ElfLoader::single_rela_fixup(const Elf64_Shdr& phdr) {
+  auto entries = elf.make_span_of_section_data<Elf64_Rela>(phdr);
+
+  for (auto& rela : entries) {
+    Elf64_Xword type = ELF64_R_TYPE(rela.r_info);
+    Elf64_Xword sym_idx = ELF64_R_SYM(rela.r_info);
+
+    Elf64_Sym& sym = elf.get_symbol_table()[sym_idx];
+    char* name = elf.get_symbol_name(sym);
+
+    uintptr_t* fixup_location = (uintptr_t*)(get_base_addr() + rela.r_offset);
+    uintptr_t fixup_with = get_base_addr() + sym.st_value;
+
+    switch (type) {
+      case R_X86_64_JUMP_SLOT:
+      case R_X86_64_GLOB_DAT:
+        *fixup_location = fixup_with;
+        break;
+      case R_X86_64_RELATIVE:
+        *fixup_location = fixup_with + rela.r_addend;
+        break;
+      default:
+        MY_ASSERT(false, "Unsupported rela type %lu", type);
+    }
+  }
+}
+
+void ElfLoader::fixup_relocations() {
+  for (auto& phdr : elf.get_section_headers()) {
+    switch (phdr.sh_type) {
       case SHT_REL:
-        printf("REL section\n");
+        assert(false && "REL relocations are not implemented!");
         break;
       case SHT_RELA:
-
-        printf("RELA section\n");
+        single_rela_fixup(phdr);
         break;
       default:
         continue;
     }
   }
-  */
 }
 
 void ElfLoader::unload() {

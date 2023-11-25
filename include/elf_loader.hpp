@@ -12,11 +12,12 @@ class ElfLoader {
   std::vector<char> elf_file;
   ElfView elf;
 
-  static bool is_segment_loadable(const Elf64_Phdr& seg);
   size_t get_mmap_len();
   void mmap_pages(size_t len);
   void copy_segments_to_mem();
-  void relocate();
+  void fixup_relocations();
+  void single_rela_fixup(const Elf64_Shdr& phdr);
+
 
   inline uintptr_t get_base_addr() { return (uintptr_t)mapped_memory.begin(); }
 

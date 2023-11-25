@@ -1,3 +1,4 @@
+
 // Test whether basic functions work
 int mul(int x, int y) {
   return x * y;

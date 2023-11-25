@@ -7,32 +7,32 @@
 
 
 Span<char> ElfView::make_symbol_string_table() {
-  Elf64_Shdr* shdr = find_single_in_span<Elf64_Shdr>(section_headers, [this] (const Elf64_Shdr& shdr) { 
-    return strcmp(section_string_table.begin() + shdr.sh_name, ".strtab") == 0; 
+  Elf64_Shdr* phdr = find_single_in_span<Elf64_Shdr>(section_headers, [this] (const Elf64_Shdr& phdr) { 
+    return strcmp(section_string_table.begin() + phdr.sh_name, ".dynstr") == 0; 
   });
-  assert(shdr->sh_type == SHT_STRTAB && "Not a string table.");
-  return make_span_of_section_data<char>(shdr);
+  assert(phdr->sh_type == SHT_STRTAB && "Not a string table.");
+  return make_span_of_section_data<char>(*phdr);
 }
 
 Span<Elf64_Sym> ElfView::make_symbol_table() {
-  Elf64_Shdr* shdr = find_single_in_span<Elf64_Shdr>(section_headers, [] (const Elf64_Shdr& shdr) { 
-    return shdr.sh_type == SHT_SYMTAB;
+  Elf64_Shdr* phdr = find_single_in_span<Elf64_Shdr>(section_headers, [] (const Elf64_Shdr& phdr) { 
+    return phdr.sh_type == SHT_DYNSYM;
   });
-  return make_span_of_section_data<Elf64_Sym>(shdr);
+  return make_span_of_section_data<Elf64_Sym>(*phdr);
 }
 
 Span<char> ElfView::make_section_string_table() {
   Elf64_Half index = header->e_shstrndx;
   assert(index != SHN_UNDEF && "File has no section name string table!");
 
-  Elf64_Shdr* shdr = &section_headers[index];
-  return make_span_of_section_data<char>(shdr);
+  Elf64_Shdr* phdr = &section_headers[index];
+  return make_span_of_section_data<char>(*phdr);
 }
 
 ElfView::ElfView(Span<char> data) : 
   data(data),
   header((Elf64_Ehdr*)data.begin()),
-  segment_headers((Elf64_Phdr*)(get_addr() + header->e_phoff), header->e_phnum),
+  program_headers((Elf64_Phdr*)(get_addr() + header->e_phoff), header->e_phnum),
   section_headers((Elf64_Shdr*)(get_addr() + header->e_shoff), header->e_shnum),
   section_string_table(make_section_string_table()),
   symbol_string_table(make_symbol_string_table()),

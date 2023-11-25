@@ -20,7 +20,7 @@ public:
   inline T* end() { return end_; }
 
   inline size_t len() { return end() - begin(); }
-  T& operator [] (size_t index) { return begin()[index]; }
+  T& operator [] (size_t index) const { return begin()[index]; }
 };
 
 
