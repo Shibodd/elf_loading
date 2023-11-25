@@ -55,13 +55,12 @@ void ElfLoader::copy_segments_to_mem() {
   }
 }
 
-ElfLoader::ElfLoader(Span<char> elf_file, Mapper& mapper)
-  : elf(elf_file), mapper(mapper) { }
-  
+ElfLoader::ElfLoader(Span<char> elf_file, Mapper mapper, Unmapper unmapper)
+  : elf(elf_file), mapper(mapper), unmapper(unmapper) { }
 
 void ElfLoader::load() {
   size_t len = get_mmap_len();
-  mapped_memory = mapper.map(len);
+  mapped_memory = mapper(len);
   copy_segments_to_mem();
   fixup_relocations();
 }
@@ -109,5 +108,5 @@ void ElfLoader::fixup_relocations() {
 }
 
 void ElfLoader::unload() {
-  mapper.unmap(mapped_memory);
+  unmapper(mapped_memory);
 }

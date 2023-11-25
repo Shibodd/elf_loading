@@ -14,10 +14,14 @@ struct Mapper {
 
 // Provides a way to load an ELF in memory and execute symbols
 class ElfLoader {
+  using Mapper = std::function<Span<char>(size_t)>;
+  using Unmapper = std::function<void(Span<char>)>;
+
   Span<char> mapped_memory;
   std::vector<char> elf_file;
   ElfView elf;
-  Mapper& mapper;
+  Mapper mapper;
+  Unmapper unmapper;
 
   size_t get_mmap_len();
   void copy_segments_to_mem();
@@ -34,7 +38,7 @@ class ElfLoader {
   }
 
 public:
-  ElfLoader(Span<char> elf_file, Mapper& mapper);
+  ElfLoader(Span<char> elf_file, Mapper mapper, Unmapper unmapper);
 
   void load();
   void unload();
