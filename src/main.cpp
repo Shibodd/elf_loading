@@ -20,12 +20,34 @@ std::vector<char> load_entire_file(const char* path) {
   return ans;
 }
 
+extern "C" {
+#include <sys/mman.h>
+}
+
+struct MmapMapper : Mapper {
+  virtual Span<char> map(size_t len) override {
+    printf("Mmapping %lu bytes\n", len);
+    int prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+    int flags = MAP_ANONYMOUS | MAP_PRIVATE;
+
+    void* base_ptr = mmap(NULL, len, prot, flags, -1, 0);
+    MY_ASSERT_PERROR(base_ptr != MAP_FAILED, "Failed to mmap.");
+    return { (char*)base_ptr, (char*)base_ptr + len };
+  }
+
+  virtual void unmap(Span<char> span) override {
+    munmap(span.begin(), span.len());
+  }
+};
+
+
 int main(int argc, char* argv[]) {
   MY_ASSERT(argc == 2, "2 args, please");
 
   std::vector<char> elf_file = load_entire_file(argv[1]);
 
-  auto elf = ElfLoader({ &*elf_file.begin(), &*elf_file.end() });
+  MmapMapper mapper;
+  auto elf = ElfLoader({ &*elf_file.begin(), &*elf_file.end() }, mapper);
   elf.load();
 
   elf.call<int, int, int>("_Z3mulii", 617, 2);

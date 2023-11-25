@@ -9,12 +9,7 @@
 #include "elf_loader.hpp"
 
 extern "C" {
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <string.h>
-#include <elf.h>
 }
 
 size_t ElfLoader::get_mmap_len() {
@@ -45,16 +40,6 @@ size_t ElfLoader::get_mmap_len() {
   return len;
 }
 
-void ElfLoader::mmap_pages(size_t len) {
-  printf("Mmapping %lu bytes\n", len);
-  int prot = PROT_READ | PROT_WRITE | PROT_EXEC;
-  int flags = MAP_ANONYMOUS | MAP_PRIVATE;
-
-  void* base_ptr = mmap(NULL, len, prot, flags, -1, 0);
-  MY_ASSERT_PERROR(base_ptr != MAP_FAILED, "Failed to mmap.");
-  mapped_memory = { (char*)base_ptr, (char*)base_ptr + len };
-}
-
 void ElfLoader::copy_segments_to_mem() {
   for (auto& phdr : elf.get_program_headers()) {
     if (phdr.p_type == PT_LOAD && phdr.p_memsz > 0) {
@@ -70,13 +55,13 @@ void ElfLoader::copy_segments_to_mem() {
   }
 }
 
-ElfLoader::ElfLoader(Span<char> elf_file)
-  : elf(elf_file) { }
+ElfLoader::ElfLoader(Span<char> elf_file, Mapper& mapper)
+  : elf(elf_file), mapper(mapper) { }
   
 
 void ElfLoader::load() {
   size_t len = get_mmap_len();
-  mmap_pages(len);
+  mapped_memory = mapper.map(len);
   copy_segments_to_mem();
   fixup_relocations();
 }
@@ -124,5 +109,5 @@ void ElfLoader::fixup_relocations() {
 }
 
 void ElfLoader::unload() {
-  
+  mapper.unmap(mapped_memory);
 }
